@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Calendar</title><meta name="theme-color" content="#7d9a85">
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Calendar"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="style.css"></head>
+<body><main id="main"></main>
+<nav><button data-a="tab" data-t="home">🏠<span>홈</span></button><button data-a="tab" data-t="cal">📅<span>캘린더</span></button><button data-a="tab" data-t="routine">✅<span>루틴</span></button><button data-a="tab" data-t="set">⚙️<span>설정</span></button></nav>
+<div id="modal"></div><div id="toast"></div>
+<input type="file" id="file" accept=".json,application/json" hidden>
+<script src="db.js"></script><script src="app.js"></script></body></html>
