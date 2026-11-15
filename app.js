@@ -6,7 +6,7 @@ const addD=(s,n)=>{const d=P(s);d.setDate(d.getDate()+n);return ds(d)};
 const DOW=['일','월','화','수','목','금','토'],PRI={high:'높음',mid:'보통',low:'낮음'},PO={high:0,mid:1,low:2};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
-let S={events:[],todos:[],routines:[],checks:[],notes:[]},CK=new Set(),NT={},META={},tab='home',calM=today().slice(0,7),selD=today(),rD=today(),PERSIST=null,EST=null,delFn=null,Q=Promise.resolve(),SO=null,SD=null;
+let S={events:[],todos:[],routines:[],checks:[],notes:[]},CK=new Set(),NT={},META={},tab='home',sv=null,calM=today().slice(0,7),selD=today(),rD=today(),PERSIST=null,EST=null,delFn=null,Q=Promise.resolve(),SO=null,SD=null;
 async function load(){for(const k in S)S[k]=await DB.all(k);CK=new Set(S.checks.map(c=>c.key));NT=Object.fromEntries(S.notes.map(n=>[n.date,n.text]));META=Object.fromEntries((await DB.all('meta')).map(x=>[x.k,x.v]))}
 // 모든 변경은 직렬 처리: IndexedDB 저장 완료 후에만 화면 갱신 및 성공 안내
 function run(fn,msg='저장되었습니다'){Q=Q.then(async()=>{try{await fn();await load();render();toast(msg)}catch(e){console.error(e);toast('저장 중 오류가 발생했습니다: '+(e.message||e),1)}});return Q}
@@ -24,9 +24,8 @@ function evList(d){const l=S.events.filter(e=>e.date===d).sort((a,b)=>(a.time||'
 function tdList(d){const l=S.todos.filter(t=>t.date===d).sort((a,b)=>a.done-b.done||PO[a.pri]-PO[b.pri]);
  return l.length?l.map(t=>`<div class="li ${t.done?'done':''}"><button class="cb ${t.done?'on':''}" data-a="tt" data-id="${esc(t.id)}" aria-label="완료"></button><div class="g" data-a="editTd" data-id="${esc(t.id)}"><p>${esc(t.title)}<span class="pri ${t.pri}">${PRI[t.pri]}</span></p></div>${t.done?'':`<button class="ic" title="내일로 미루기" data-a="next" data-id="${esc(t.id)}">➜</button>`}<button class="ic" title="삭제" data-a="tdel" data-id="${esc(t.id)}">✕</button></div>`).join(''):'<p class="empty">등록된 할 일이 없어요</p>'}
 const rtList=d=>{const l=S.routines.filter(r=>applies(r,d));return l.length?l.map(r=>`<div class="li"><button class="cb ${CK.has(r.id+'|'+d)?'on':''}" data-a="tr" data-id="${esc(r.id)}" data-d="${d}"></button><div class="g"><p>${esc(r.name)}</p><small>${esc(r.desc)}</small></div></div>`).join(''):'<p class="empty">이 날 수행할 루틴이 없어요</p>'};
-function vHome(){const t=today(),d=P(t),td=S.todos.filter(x=>x.date===t),dn=td.filter(x=>x.done).length,p=pct(dn,td.length),h=new Date().getHours(),r=dayRate(t);
+function vHome(){const t=today(),d=P(t),h=new Date().getHours(),r=dayRate(t);
  return`<div class="top"><h1>Calendar</h1><div class="d">${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 ${DOW[d.getDay()]}요일</div><small>${h<12?'좋은 아침이에요. 오늘도 차분하게 시작해요.':h<18?'오후도 힘내요. 할 일을 하나씩 해결해 봐요.':'오늘 하루도 수고했어요.'}</small></div>`+
- sec('오늘의 진행 상황','',`<div class="stats"><span>할 일 ${td.length}개 중 ${dn}개 완료</span><b>${p}%</b></div>${bar(p)}`)+
  sec('오늘의 일정',`${go('cal','캘린더')}<button class="btn sm" data-a="addEv" data-d="${t}">+ 추가</button>`,evList(t))+
  sec('오늘의 할 일',`${go('cal','캘린더')}<button class="btn sm" data-a="addTd" data-d="${t}">+ 추가</button>`,tdList(t))+
  (NT[t]?memoSec(t,'오늘의 메모'):'')+
@@ -37,20 +36,22 @@ function vCal(){const f=P(calM+'-01'),y=f.getFullYear(),m=f.getMonth(),n=new Dat
  let c=DOW.map(x=>`<span>${x}</span>`).join('')+'<span></span>'.repeat(f.getDay());
  for(let i=1;i<=n;i++){const d=`${calM}-${pad(i)}`,e=S.events.some(x=>x.date===d),k=S.todos.some(x=>x.date===d);
   c+=`<button class="day ${d===t?'today':''} ${d===selD?'sel':''}" data-a="sel" data-d="${d}">${i}<span class="dots">${dots(d)}</span></button>`}
- const sd=P(selD);
- return`<div class="top"><h1>캘린더</h1></div><section class="card"><div class="nav2"><button class="btn sm ghost" data-a="mp">‹</button><b>${y}년 ${m+1}월</b><button class="btn sm ghost" data-a="mn">›</button><button class="btn sm" data-a="mt">오늘</button></div><div class="grid">${c}</div><small>● 일정 &nbsp;<span style="color:#e0a458">●</span> 할 일 &nbsp;<span style="color:#8aa4d6">●</span> 메모</small></section>`+
- sec(`${sd.getMonth()+1}월 ${sd.getDate()}일 (${DOW[sd.getDay()]}) 일정`,`<button class="btn sm" data-a="addEv" data-d="${selD}">+ 일정</button>`,evList(selD))+
- sec('할 일',`<button class="btn sm" data-a="addTd" data-d="${selD}">+ 할 일</button>`,tdList(selD))+memoSec(selD)}
+ const sd=P(selD),dl=`${sd.getMonth()+1}월 ${sd.getDate()}일 (${DOW[sd.getDay()]})`;
+ return`<div class="top"><h1>Calendar</h1></div><section class="card"><div class="nav2"><button class="btn sm ghost" data-a="mp">‹</button><b>${y}년 ${m+1}월</b><button class="btn sm ghost" data-a="mn">›</button><button class="btn sm" data-a="mt">오늘</button></div><div class="grid">${c}</div><small>● 일정 &nbsp;<span style="color:#e0a458">●</span> 할 일 &nbsp;<span style="color:#8aa4d6">●</span> 메모</small></section>`+
+ sec(`${dl} 일정`,`<button class="btn sm" data-a="addEv" data-d="${selD}">+ 일정</button>`,evList(selD))+
+ sec(`${dl} 할 일`,`<button class="btn sm" data-a="addTd" data-d="${selD}">+ 할 일</button>`,tdList(selD))+memoSec(selD,`${dl} 메모`)}
 function strip(){const t=today();let h='';for(let i=-90;i<=60;i++){const d=addD(t,i),D=P(d),r=dayRate(d),v=d>t?'':r.n?pct(r.k,r.n):'-';h+=`<div class="sd ${i?'':'today'}" data-d="${d}"><small>${DOW[D.getDay()]}</small><b>${D.getDate()}</b><em>${v}</em></div>`}return`<div id="strip" class="strip">${h}</div>`}
 function fixStrip(){const s=$('#strip');if(!s)return;const t=today(),c=s.children[90],mid=()=>c.offsetLeft-(s.clientWidth-c.offsetWidth)/2;if(SO==null||SD!==t){s.scrollLeft=mid();SD=t}else s.scrollLeft=SO;SO=s.scrollLeft;s.onscroll=()=>{SO=s.scrollLeft}}
 function vRoutine(){const t=today(),w=(P(t).getDay()+6)%7,r=dayRate(rD),d=P(rD),cnt=S.routines.map(x=>[x.name+(x.delAt?' (삭제됨)':''),S.checks.filter(c=>c.rid===x.id).length]).filter(x=>x[1]||true);
  const act=S.routines.filter(x=>!x.delAt);
- return`<div class="top"><h1>루틴</h1></div>`+
+ return`<div class="top"><h1>Calendar</h1></div>`+
  sec('루틴 체크',`<button class="btn sm" data-a="addRt">+ 루틴</button>`,`<div class="nav2"><button class="btn sm ghost" data-a="rp">‹</button><b>${d.getMonth()+1}월 ${d.getDate()}일 (${DOW[d.getDay()]})</b><button class="btn sm ghost" data-a="rn">›</button><button class="btn sm" data-a="rt">오늘</button></div>${r.n?`<div class="stats"><span>${r.n}개 중 ${r.k}개</span><b>${pct(r.k,r.n)}%</b></div>${bar(pct(r.k,r.n))}`:''}${rtList(rD)}`)+
  sec('통계',`<button class="btn sm ghost" data-a="sl">‹</button><button class="btn sm" data-a="st">오늘</button><button class="btn sm ghost" data-a="sr">›</button>`,`${strip()}<div class="stats"><span>연속 달성 일수</span><b>${streak()}일</b></div><h2 style="margin:12px 0 4px">루틴별 완료 횟수</h2>${cnt.length?cnt.map(x=>`<div class="li"><div class="g"><p>${esc(x[0])}</p></div><b>${x[1]}회</b></div>`).join(''):'<p class="empty">아직 루틴이 없어요</p>'}`)+
  sec('루틴 관리','',act.length?act.map(x=>`<div class="li"><div class="g" data-a="editRt" data-id="${esc(x.id)}"><p>${esc(x.name)}${x.active?'':' <span class="pri">비활성</span>'}</p><small>${x.days.length===7?'매일':[...x.days].sort().map(i=>DOW[i]).join(' ')}</small></div><button class="ic" data-a="editRt" data-id="${esc(x.id)}">✎</button></div>`).join(''):'<p class="empty">루틴을 추가해 보세요</p>')}
-function vSet(){const lb=META.lastBackup?new Date(META.lastBackup).toLocaleString('ko-KR'):'없음',us=EST&&EST.usage!=null?` (사용량 약 ${(EST.usage/1024).toFixed(0)}KB)`:'';
- return`<div class="top"><h1>설정</h1></div>`+
+function vSet(){const top='<div class="top"><h1>Calendar</h1></div>';
+ if(sv!=='bk')return top+`<button class="menu" data-a="sv" data-v="bk"><b>데이터 백업 및 복원</b><small>데이터를 파일로 저장해 두거나, 저장해 둔 파일에서 되살릴 수 있어요.</small><i>›</i></button>`;
+ const lb=META.lastBackup?new Date(META.lastBackup).toLocaleString('ko-KR'):'없음',us=EST&&EST.usage!=null?` (사용량 약 ${(EST.usage/1024).toFixed(0)}KB)`:'';
+ return top+`<button class="btn ghost back" data-a="sv" data-v="">← 설정으로 돌아가기</button>`+
  sec('데이터 백업','',`<p class="muted">최근 백업: ${lb}</p><button class="btn full" data-a="exp">백업 파일 저장 (JSON)</button>`)+
  sec('데이터 복원','',`<p class="muted">백업 파일을 불러오면 현재 데이터가 백업 내용으로 교체됩니다. 잘못된 파일은 거부되며 기존 데이터는 보호됩니다.</p><button class="btn full ghost" data-a="imp">백업 파일 불러오기</button>`)+
  sec('저장 상태','',`<p class="muted">데이터는 이 기기의 브라우저(IndexedDB)에만 저장됩니다.<br>영구 저장 권한: ${PERSIST===null?'이 브라우저에서 지원하지 않음':PERSIST?'허용됨':'미허용 (정기적으로 백업해 주세요)'}${us}<br>현재 저장된 일정 ${S.events.length} · 할 일 ${S.todos.length} · 루틴 ${S.routines.filter(r=>!r.delAt).length} · 체크 기록 ${S.checks.length}건 · 메모 ${S.notes.length}건</p>`)+
@@ -69,7 +70,8 @@ function modal(title,fields,ok,del){const m=$('#modal');delFn=del;m.className='o
  $('#f').onsubmit=e=>{e.preventDefault();if(ok(new FormData(e.target))!==false)closeM()}}
 const closeM=()=>{$('#modal').className='';$('#modal').innerHTML='';delFn=null};
 const A={};
-A.tab=e=>{tab=e.dataset.t;SO=null;$('#main').scrollTop=0;render()};
+A.tab=e=>{tab=e.dataset.t;sv=null;SO=null;$('#main').scrollTop=0;render()};
+A.sv=e=>{sv=e.dataset.v||null;$('#main').scrollTop=0;render()};
 A.close=closeM;A.mdel=()=>{const f=delFn;closeM();f&&f()};
 A.pre=e=>{document.querySelectorAll('[name=d]').forEach(c=>c.checked=e.dataset.p.includes(c.value))};
 A.tt=e=>{const t=S.todos.find(x=>x.id===e.dataset.id);t&&run(()=>DB.put('todos',{...t,done:!t.done}),t.done?'완료를 취소했어요':'완료!')};
