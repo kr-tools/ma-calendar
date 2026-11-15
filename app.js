@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.0.7',$=s=>document.querySelector(s),pad=n=>String(n).padStart(2,'0');
+const VER='1.0',$=s=>document.querySelector(s),pad=n=>String(n).padStart(2,'0');
 const ds=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,today=()=>ds(new Date());
 const P=s=>{const[a,b,c]=s.split('-').map(Number);return new Date(a,b-1,c)};
 const addD=(s,n)=>{const d=P(s);d.setDate(d.getDate()+n);return ds(d)};
